@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pattern</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['system-ui','-apple-system','BlinkMacSystemFont','sans-serif']}}}}</script>
+    <style>
+        body{touch-action:none}
+        .shared-view .main-ui,.shared-view header{display:none!important}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .animate-spin{animation:spin 0.8s linear infinite}
+        @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(8px)}}
+        .toast-in{animation:toastIn 0.2s ease forwards}
+        .toast-out{animation:toastOut 0.2s ease forwards}
+    </style>
+</head>
+<body class="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 h-full flex flex-col justify-between transition-colors duration-300">
+
+<header class="px-8 py-8 flex justify-between items-center max-w-md mx-auto w-full">
+    <div>
+        <h1 class="text-xl font-bold tracking-tight">Pattern</h1>
+        <p id="app-subtitle" class="text-xs text-zinc-400 dark:text-zinc-500 transition-colors">Draw and share locks</p>
+    </div>
+    <button id="theme-toggle" aria-label="Toggle theme" class="p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors">
+        <svg id="theme-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"></svg>
+    </button>
+</header>
+
+<main class="flex-grow flex flex-col items-center justify-center p-6 gap-8 max-w-sm mx-auto w-full">
+    <div class="relative w-full aspect-square flex items-center justify-center">
+        <canvas id="patternCanvas" width="280" height="280" class="block cursor-pointer bg-transparent"></canvas>
+    </div>
+    <div id="shared-controls" class="hidden flex-col gap-3 w-full">
+        <button id="btn-replay" class="w-full text-xs font-semibold py-4 px-4 rounded-full transition-all">Play Again</button>
+        <a href="index.html" class="w-full text-center bg-zinc-100 hover:bg-zinc-200/60 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-semibold py-4 px-4 rounded-full transition-all">Create Your Own</a>
+    </div>
+    <div class="main-ui w-full flex flex-col gap-3">
+        <div class="flex gap-3">
+            <button id="btn-clear" class="flex-1 text-xs font-semibold py-4 px-4 rounded-full transition-all">Clear</button>
+            <button id="btn-settings" class="flex-1 text-xs font-semibold py-4 px-4 rounded-full transition-all">Settings</button>
+        </div>
+        <button id="btn-share-modal" class="w-full text-xs font-semibold py-4 px-4 rounded-full transition-all">Share Pattern</button>
+    </div>
+</main>
+
+<div id="share-modal" class="fixed inset-0 bg-zinc-950/40 dark:bg-zinc-950/70 hidden items-center justify-center p-4 z-50 backdrop-blur-sm">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/60 rounded-[36px] p-8 w-full max-w-sm shadow-2xl flex flex-col gap-0">
+        <div id="modal-toast" class="hidden mb-4 bg-zinc-950 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-xs py-2.5 px-4 rounded-2xl text-center"></div>
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-sm font-semibold">Share & Export</h2>
+            <button id="btn-close-share" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors" aria-label="Close">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="flex flex-col gap-3">
+            <div class="grid grid-cols-2 gap-2">
+                <button id="btn-copy-link" class="text-xs font-semibold py-3.5 px-4 rounded-2xl transition-all">Copy Link</button>
+                <button id="btn-system-share" class="text-xs font-semibold py-3.5 px-4 rounded-2xl transition-all">System Share</button>
+            </div>
+            <button id="btn-export-action" class="w-full text-xs font-semibold py-4 px-4 rounded-2xl transition-all flex items-center justify-center gap-2">
+                <span id="export-btn-text">Export as GIF</span>
+                <svg id="export-spinner" class="hidden w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+            </button>
+            <div class="mt-1">
+                <span class="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-bold block mb-2">Export Format</span>
+                <div class="grid grid-cols-4 gap-1.5">
+                    <label class="fmt-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="export-format" value="gif" checked class="sr-only">
+                        <span class="text-xs font-bold fmt-label">GIF</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none fmt-border"></div>
+                    </label>
+                    <label class="fmt-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="export-format" value="webm" class="sr-only">
+                        <span class="text-xs font-bold fmt-label">WebM</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none fmt-border"></div>
+                    </label>
+                    <label class="fmt-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="export-format" value="mp4" class="sr-only">
+                        <span class="text-xs font-bold fmt-label">MP4</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none fmt-border"></div>
+                    </label>
+                    <label class="fmt-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="export-format" value="png" class="sr-only">
+                        <span class="text-xs font-bold fmt-label">PNG</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none fmt-border"></div>
+                    </label>
+                </div>
+                <p id="format-hint" class="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2 text-center min-h-[14px]"></p>
+            </div>
+            <div id="transp-row" class="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <div class="flex flex-col pr-4">
+                    <span class="text-xs font-semibold">Transparent background</span>
+                    <span id="export-bg-desc" class="text-[10px] text-zinc-400">Solid background</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="input-export-transparent" class="sr-only peer">
+                    <div id="toggle-bg-element" class="w-10 h-6 bg-zinc-200 rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="settings-modal" class="fixed inset-0 bg-zinc-950/40 dark:bg-zinc-950/70 hidden items-center justify-center p-4 z-50 backdrop-blur-sm">
+    <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/60 rounded-[32px] p-8 w-full max-w-xs shadow-2xl">
+        <h2 class="text-sm font-semibold mb-6">Settings</h2>
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Columns</label>
+                    <input type="number" id="input-cols" min="2" max="6" value="3" class="w-full bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-2xl px-4 py-3.5 text-xs focus:outline-none focus:border-zinc-400">
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Rows</label>
+                    <input type="number" id="input-rows" min="2" max="6" value="3" class="w-full bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-2xl px-4 py-3.5 text-xs focus:outline-none focus:border-zinc-400">
+                </div>
+            </div>
+            <div class="flex flex-col gap-1.5 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <label class="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Animation Speed</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="speed-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="speed" value="slow" class="sr-only">
+                        <span class="text-xs font-bold speed-label text-zinc-400 dark:text-zinc-500">Slow</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none speed-border"></div>
+                    </label>
+                    <label class="speed-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="speed" value="medium" checked class="sr-only">
+                        <span class="text-xs font-bold speed-label text-zinc-400 dark:text-zinc-500">Medium</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none speed-border"></div>
+                    </label>
+                    <label class="speed-opt relative flex flex-col items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                        <input type="radio" name="speed" value="fast" class="sr-only">
+                        <span class="text-xs font-bold speed-label text-zinc-400 dark:text-zinc-500">Fast</span>
+                        <div class="absolute inset-0 rounded-xl border-2 border-transparent pointer-events-none speed-border"></div>
+                    </label>
+                </div>
+            </div>
+            <div class="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <div>
+                    <span class="text-xs font-semibold">Allow dot skipping</span>
+                    <p class="text-[10px] text-zinc-400">Skip directly over middle dots</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="input-skipping" class="sr-only peer">
+                    <div id="toggle-skip-element" class="w-10 h-6 bg-zinc-200 rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100"></div>
+                </label>
+            </div>
+            <div class="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <div>
+                    <span class="text-xs font-semibold">Visual style</span>
+                    <p id="active-style-desc" class="text-[10px] text-zinc-400">Colorless</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="input-colorful" class="sr-only peer">
+                    <div id="toggle-color-element" class="w-10 h-6 bg-zinc-200 rounded-full peer dark:bg-zinc-800 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-zinc-100"></div>
+                </label>
+            </div>
+        </div>
+        <div class="mt-8 flex gap-3">
+            <button id="btn-save-settings" class="flex-1 py-3.5 rounded-full text-xs font-semibold transition-all">Apply</button>
+            <button id="btn-close-settings" class="flex-1 py-3.5 rounded-full text-xs font-semibold transition-all">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<footer class="p-6 text-center text-[10px] text-zinc-400 dark:text-zinc-600">Minimalist Lock Screen Simulator</footer>
+
+<script type="module">
+let Mp4Muxer=null;
+import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.0.1/build/mp4-muxer.mjs').then(m=>{Mp4Muxer=m;}).catch(()=>{});
+
+const SPEEDS={slow:0.006,medium:0.016,fast:0.035};
+let speedKey='medium';
+const getSpeed=()=>SPEEDS[speedKey]||SPEEDS.medium;
+
+const canvas=document.getElementById('patternCanvas');
+const ctx=canvas.getContext('2d');
+let cols=3,rows=3,allowSkipping=false,isColorful=false;
+let dots=[],currentPath=[],isDrawing=false,isPlaying=false,currentMousePos=null;
+let playbackProgress=0,playbackIndex=0;
+const BASE_R=6,ACTIVE_R=11;
+
+const $=id=>document.getElementById(id);
+const btnClear=$('btn-clear'),btnSettings=$('btn-settings'),btnShareModal=$('btn-share-modal');
+const shareModal=$('share-modal'),btnCloseShare=$('btn-close-share');
+const btnCopyLink=$('btn-copy-link'),btnSystemShare=$('btn-system-share');
+const btnExportAction=$('btn-export-action'),exportBtnText=$('export-btn-text'),exportSpinner=$('export-spinner');
+const btnReplay=$('btn-replay'),inputExportTransparent=$('input-export-transparent'),exportBgDesc=$('export-bg-desc');
+const formatHint=$('format-hint'),settingsModal=$('settings-modal');
+const btnSaveSettings=$('btn-save-settings'),btnCloseSettings=$('btn-close-settings');
+const inputCols=$('input-cols'),inputRows=$('input-rows'),inputSkipping=$('input-skipping'),inputColorful=$('input-colorful');
+const activeStyleDesc=$('active-style-desc'),themeToggle=$('theme-toggle'),themeIcon=$('theme-icon');
+const sharedControls=$('shared-controls'),modalToast=$('modal-toast'),transpRow=$('transp-row');
+
+// toast manager
+let toastTimer;
+function showToast(msg,isModal=false){
+    if(isModal){
+        modalToast.innerText=msg;
+        modalToast.classList.remove('hidden','toast-out');
+        modalToast.classList.add('toast-in');
+        clearTimeout(toastTimer);
+        toastTimer=setTimeout(()=>{modalToast.classList.remove('toast-in');modalToast.classList.add('toast-out');setTimeout(()=>modalToast.classList.add('hidden'),200);},3000);
+    } else {
+        const t=document.createElement('div');
+        t.className='fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 text-xs py-3 px-6 rounded-full shadow-lg z-[100] toast-in';
+        t.innerText=msg; document.body.appendChild(t);
+        setTimeout(()=>{t.classList.add('toast-out');setTimeout(()=>t.remove(),200);},2800);
+    }
+}
+
+// theme toggle and styles
+function initTheme(){
+    const sys=window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const saved=localStorage.getItem('theme');
+    document.documentElement.classList.toggle('dark',saved==='dark'||(!saved&&sys));
+    updateThemeIcon();applyVisualTheme();
+}
+function updateThemeIcon(){
+    const dark=document.documentElement.classList.contains('dark');
+    themeIcon.innerHTML=dark
+        ?`<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>`
+        :`<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>`;
+}
+function applyVisualTheme(){
+    const cp=isColorful
+        ?['bg-violet-600','hover:bg-violet-500','text-white','dark:bg-violet-500','dark:hover:bg-violet-400']
+        :['bg-zinc-900','hover:bg-zinc-800','text-white','dark:bg-zinc-100','dark:hover:bg-zinc-200','dark:text-zinc-950'];
+    const cs=isColorful
+        ?['bg-violet-50','hover:bg-violet-100','text-violet-700','dark:bg-violet-950/40','dark:hover:bg-violet-900/50','dark:text-violet-200']
+        :['bg-zinc-100','hover:bg-zinc-200/60','text-zinc-900','dark:bg-zinc-900','dark:hover:bg-zinc-800','dark:text-zinc-50'];
+    const allP=['bg-violet-600','hover:bg-violet-500','text-white','dark:bg-violet-500','dark:hover:bg-violet-400','bg-zinc-900','hover:bg-zinc-800','dark:bg-zinc-100','dark:hover:bg-zinc-200','dark:text-zinc-950'];
+    const allS=['bg-violet-50','hover:bg-violet-100','text-violet-700','dark:bg-violet-950/40','dark:hover:bg-violet-900/50','dark:text-violet-200','bg-zinc-100','hover:bg-zinc-200/60','text-zinc-900','dark:bg-zinc-900','dark:hover:bg-zinc-800','dark:text-zinc-50'];
+    [btnReplay,btnShareModal,btnExportAction,btnSaveSettings].forEach(b=>{b.classList.remove(...allP);b.classList.add(...cp);});
+    [btnClear,btnSettings,btnCopyLink,btnSystemShare,btnCloseSettings].forEach(b=>{b.classList.remove(...allS);b.classList.add(...cs);});
+    const sub=$('app-subtitle');
+    sub.classList.remove('dark:text-violet-400','text-violet-600','dark:text-zinc-500','text-zinc-400');
+    sub.classList.add(...(isColorful?['dark:text-violet-400','text-violet-600']:['dark:text-zinc-500','text-zinc-400']));
+    ['toggle-bg-element','toggle-skip-element','toggle-color-element'].forEach(id=>{
+        const el=$(id);if(!el)return;
+        el.classList.remove('peer-checked:bg-violet-600','peer-checked:bg-zinc-900','dark:peer-checked:bg-zinc-100');
+        el.classList.add(...(isColorful?['peer-checked:bg-violet-600']:['peer-checked:bg-zinc-900','dark:peer-checked:bg-zinc-100']));
+    });
+    updateSpeedUI();updateFormatUI();
+}
+themeToggle.addEventListener('click',()=>{
+    const dark=document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme',dark?'dark':'light');
+    updateThemeIcon();applyVisualTheme();
+});
+
+// speed selector
+function updateSpeedUI(){
+    document.querySelectorAll('.speed-opt').forEach(opt=>{
+        const r=opt.querySelector('input'),lbl=opt.querySelector('.speed-label'),brd=opt.querySelector('.speed-border');
+        const on=r.checked;
+        lbl.className='text-xs font-bold speed-label '+(on?(isColorful?'text-violet-600 dark:text-violet-400':'text-zinc-900 dark:text-zinc-50'):'text-zinc-400 dark:text-zinc-500');
+        brd.className='absolute inset-0 rounded-xl border-2 pointer-events-none speed-border '+(on?(isColorful?'border-violet-500 dark:border-violet-400':'border-zinc-900 dark:border-zinc-100'):'border-transparent');
+    });
+}
+document.querySelectorAll('input[name="speed"]').forEach(r=>r.addEventListener('change',updateSpeedUI));
+
+// grid initialization
+function gcd(a,b){while(b){[a,b]=[b,a%b];}return a;}
+function getDotCoords(id,c,r,w,h){return{x:w/(c+1)*(id%c+1),y:h/(r+1)*(Math.floor(id/c)+1)};}
+function initGrid(){
+    dots=[];currentPath=[];
+    for(let i=0;i<rows*cols;i++){
+        const{x,y}=getDotCoords(i,cols,rows,canvas.width,canvas.height);
+        dots.push({id:i,x,y,scale:0,velocity:0,targetScale:0,rippleRadius:0,rippleOpacity:0});
+    }
+    dots.forEach((d,i)=>setTimeout(()=>d.targetScale=1,i*35));
+}
+function triggerRipple(dot){dot.rippleRadius=BASE_R;dot.rippleOpacity=0.8;}
+
+// color settings
+function getColors(){
+    const dark=document.documentElement.classList.contains('dark');
+    return isColorful?{
+        dot:dark?'#3f3f46':'#e4e4e7',activeDot:'#8b5cf6',coreDot:'#ffffff',
+        line:'#8b5cf6',glow:'rgba(139,92,246,0.2)',bg:dark?'#09090b':'#ffffff',
+        accent:'#8b5cf6'
+    }:{
+        dot:dark?'#3f3f46':'#e4e4e7',activeDot:dark?'#fafafa':'#18181b',coreDot:dark?'#09090b':'#ffffff',
+        line:dark?'#fafafa':'#18181b',glow:dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)',bg:dark?'#09090b':'#ffffff',
+        accent:dark?'#fafafa':'#18181b'
+    };
+}
+
+// spring physics updates
+function updatePhysics(){
+    dots.forEach(dot=>{
+        const inPath=currentPath.includes(dot.id);
+        const visible=!isPlaying||currentPath.indexOf(dot.id)<=playbackIndex;
+        dot.targetScale=(inPath&&visible)?1.35:(dot.targetScale!==0?1:0);
+        dot.velocity=(dot.velocity-0.16*(dot.scale-dot.targetScale))*0.72;
+        dot.scale+=dot.velocity;
+        if(dot.rippleOpacity>0){dot.rippleRadius+=1.8;dot.rippleOpacity=Math.max(0,dot.rippleOpacity-0.024);}
+    });
+    if(isPlaying&&currentPath.length>0){
+        const prev=playbackIndex;
+        playbackProgress+=getSpeed();
+        if(playbackProgress>=1){
+            playbackProgress=0;playbackIndex++;
+            if(playbackIndex>=currentPath.length-1){isPlaying=false;playbackIndex=0;playbackProgress=0;}
+        }
+        if(isPlaying&&playbackIndex!==prev&&playbackIndex<currentPath.length){
+            const nd=dots.find(d=>d.id===currentPath[playbackIndex]);
+            if(nd)triggerRipple(nd);
+        }
+    }
+}
+
+// canvas renderer
+function drawFrame(tCtx,tw,th,path,playing,pIdx,pProg,drawing,mousePos,usePhysics=false,solidBg=false,annotate=false){
+    const C=getColors();
+    const sc=tw/canvas.width;
+    if(solidBg){tCtx.fillStyle=C.bg;tCtx.fillRect(0,0,tw,th);}
+    else tCtx.clearRect(0,0,tw,th);
+
+    const rd=dots.map((src,i)=>{
+        const coords=getDotCoords(i,cols,rows,tw,th);
+        let active=false,rf=1,ripple={radius:0,opacity:0};
+        if(usePhysics){
+            rf=src.scale;active=path.includes(i)&&(!playing||path.indexOf(i)<=pIdx);
+            ripple={radius:src.rippleRadius*sc,opacity:src.rippleOpacity};
+        } else {
+            if(path.includes(i)){
+                const pp=path.indexOf(i);
+                if(playing){if(pp<=pIdx){active=true;rf=1.35;}else if(pp===pIdx+1){active=true;rf=1+0.35*pProg;}}
+                else{active=true;rf=1.35;}
+            }
+        }
+        return{id:i,x:coords.x,y:coords.y,rf,active,ripple};
+    });
+
+    if(path.length>0){
+        const first=rd.find(d=>d.id===path[0]);
+        tCtx.beginPath();tCtx.strokeStyle=C.line;tCtx.lineWidth=4*sc;
+        tCtx.lineCap='round';tCtx.lineJoin='round';
+        tCtx.shadowColor=C.glow;tCtx.shadowBlur=10*sc;
+        tCtx.moveTo(first.x,first.y);
+        if(playing){
+            for(let i=1;i<=pIdx&&i<path.length;i++){const d=rd.find(x=>x.id===path[i]);tCtx.lineTo(d.x,d.y);}
+            if(pIdx<path.length-1){
+                const s=rd.find(x=>x.id===path[pIdx]),e=rd.find(x=>x.id===path[pIdx+1]);
+                tCtx.lineTo(s.x+(e.x-s.x)*pProg,s.y+(e.y-s.y)*pProg);
+            }
+        } else {
+            for(let i=1;i<path.length;i++){const d=rd.find(x=>x.id===path[i]);tCtx.lineTo(d.x,d.y);}
+            if(mousePos&&drawing)tCtx.lineTo(mousePos.x,mousePos.y);
+        }
+        tCtx.stroke();tCtx.shadowBlur=0;
+    }
+
+    const br=BASE_R*sc,ar=ACTIVE_R*sc;
+    rd.forEach(dot=>{
+        if(dot.ripple.opacity>0){
+            tCtx.beginPath();tCtx.arc(dot.x,dot.y,dot.ripple.radius,0,Math.PI*2);
+            tCtx.strokeStyle=C.line;tCtx.globalAlpha=dot.ripple.opacity;tCtx.lineWidth=1.5;tCtx.stroke();tCtx.globalAlpha=1;
+        }
+        const r=Math.max(0,(dot.active?ar:br)*dot.rf);
+        tCtx.beginPath();tCtx.arc(dot.x,dot.y,r,0,Math.PI*2);
+        tCtx.fillStyle=dot.active?C.activeDot:C.dot;tCtx.fill();
+        if(dot.active&&(!playing||path.indexOf(dot.id)<=pIdx)){
+            tCtx.beginPath();tCtx.arc(dot.x,dot.y,3*sc*dot.rf,0,Math.PI*2);
+            tCtx.fillStyle=C.coreDot;tCtx.fill();
+        }
+    });
+
+
+    // png start arrow
+    if(annotate&&path.length>0){
+
+        const dark=document.documentElement.classList.contains('dark')
+        const arrowFill=isColorful?'#22c55e':(dark?'#09090b':'#ffffff')
+        const arrowStroke=isColorful?'#22c55e':(dark?'#fafafa':'#18181b')
+        const arrowLen=18*sc
+        const arrowGap=ar*1.8+12*sc
+
+        const start = rd.find(d => d.id === path[0]);
+        const next  = rd.find(d => d.id === path[1]);
+
+        const dx = next.x - start.x;
+        const dy = next.y - start.y;
+
+        const len = Math.hypot(dx, dy);
+        const nx = dx / len;
+        const ny = dy / len;
+
+        // place arrow slightly before first node
+        const arrowX = start.x - nx * arrowGap;
+        const arrowY = start.y - ny * arrowGap;
+
+        function drawArrow(x, y, dx, dy) {
+            const len = Math.hypot(dx, dy);
+            if (!len) return;
+
+            const nx = dx / len;
+            const ny = dy / len;
+
+            const headLen = 12 * sc;
+            const headWidth = 8 * sc;
+            const shaftLen = 18 * sc;
+
+            const tailX = x - nx * shaftLen;
+            const tailY = y - ny * shaftLen;
+
+            const px = -ny;
+            const py = nx;
+
+            tCtx.save();
+            tCtx.strokeStyle = arrowStroke;
+            tCtx.fillStyle = arrowFill;
+            tCtx.lineWidth = 2.5 * sc;
+            tCtx.lineCap = 'round';
+            tCtx.lineJoin = 'round';
+
+            // shaft
+            tCtx.beginPath();
+            tCtx.moveTo(tailX, tailY);
+            tCtx.lineTo(x, y);
+            tCtx.stroke();
+
+            // arrowhead
+            tCtx.beginPath();
+            tCtx.moveTo(x, y); // tip
+            tCtx.lineTo(
+                x - nx * headLen + px * headWidth,
+                y - ny * headLen + py * headWidth
+            );
+            tCtx.lineTo(
+                x - nx * headLen - px * headWidth,
+                y - ny * headLen - py * headWidth
+            );
+            tCtx.closePath();
+            tCtx.fill();
+            tCtx.stroke();
+
+            tCtx.restore();
+        }
+
+        drawArrow(arrowX, arrowY, dx, dy);
+    }
+}
+
+function runLoop(){
+    updatePhysics();
+    drawFrame(ctx,canvas.width,canvas.height,currentPath,isPlaying,playbackIndex,playbackProgress,isDrawing,currentMousePos,true,false,false);
+    requestAnimationFrame(runLoop);
+}
+
+// event listeners and collision
+function getCoords(e){
+    const rect=canvas.getBoundingClientRect();
+    const cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;
+    return{x:(cx-rect.left)/rect.width*canvas.width,y:(cy-rect.top)/rect.height*canvas.height};
+}
+function checkCollision(pos){
+    for(const dot of dots){
+        if(Math.hypot(dot.x-pos.x,dot.y-pos.y)<24){
+            if(!currentPath.includes(dot.id)){
+                if(currentPath.length>0&&!allowSkipping){
+                    const aId=currentPath[currentPath.length-1],bId=dot.id;
+                    const dr=Math.floor(bId/cols)-Math.floor(aId/cols),dc=(bId%cols)-(aId%cols);
+                    const g=gcd(Math.abs(dr),Math.abs(dc));
+                    if(g>1)for(let k=1;k<g;k++){
+                        const intId=(Math.floor(aId/cols)+k*dr/g)*cols+(aId%cols)+k*dc/g;
+                        if(!currentPath.includes(intId)){currentPath.push(intId);triggerRipple(dots[intId]);}
+                    }
+                }
+                currentPath.push(dot.id);triggerRipple(dot);
+                if(navigator.vibrate)navigator.vibrate(8);
+            }
+            break;
+        }
+    }
+}
+const startDrawing=e=>{if(isPlaying)return;isDrawing=true;currentPath=[];currentMousePos=getCoords(e);checkCollision(currentMousePos);};
+const moveDrawing=e=>{if(!isDrawing||isPlaying)return;currentMousePos=getCoords(e);checkCollision(currentMousePos);};
+const stopDrawing=()=>{isDrawing=false;currentMousePos=null;};
+canvas.addEventListener('mousedown',startDrawing);
+canvas.addEventListener('mousemove',moveDrawing);
+window.addEventListener('mouseup',stopDrawing);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();startDrawing(e);},{passive:false});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();moveDrawing(e);},{passive:false});
+canvas.addEventListener('touchend',stopDrawing);
+
+// settings modal logic
+btnSettings.addEventListener('click',()=>{
+    inputCols.value=cols;inputRows.value=rows;inputSkipping.checked=allowSkipping;inputColorful.checked=isColorful;
+    activeStyleDesc.innerText=isColorful?'Colorful':'Colorless';
+    const sp=document.querySelector(`input[name="speed"][value="${speedKey}"]`);if(sp)sp.checked=true;
+    updateSpeedUI();
+    settingsModal.classList.remove('hidden');settingsModal.classList.add('flex');
+});
+btnCloseSettings.addEventListener('click',()=>{settingsModal.classList.remove('flex');settingsModal.classList.add('hidden');});
+inputColorful.addEventListener('change',()=>{activeStyleDesc.innerText=inputColorful.checked?'Colorful':'Colorless';});
+btnSaveSettings.addEventListener('click',()=>{
+    cols=Math.min(6,Math.max(2,parseInt(inputCols.value)||3));
+    rows=Math.min(6,Math.max(2,parseInt(inputRows.value)||3));
+    allowSkipping=inputSkipping.checked;isColorful=inputColorful.checked;
+    speedKey=document.querySelector('input[name="speed"]:checked')?.value||'medium';
+    settingsModal.classList.remove('flex');settingsModal.classList.add('hidden');
+    applyVisualTheme();initGrid();
+});
+btnClear.addEventListener('click',()=>{if(!isPlaying)currentPath=[];});
+[shareModal,settingsModal].forEach(m=>m.addEventListener('click',e=>{if(e.target===m){m.classList.remove('flex');m.classList.add('hidden');}}));
+
+// sharing link and modal
+function getShareUrl(){return`${location.origin}${location.pathname}?w=${cols}&h=${rows}&s=${allowSkipping?1:0}&c=${isColorful?1:0}&sp=${speedKey}&p=${currentPath.join(',')}`;}
+btnShareModal.addEventListener('click',()=>{
+    if(currentPath.length===0){showToast('Draw a pattern first',false);return;}
+    shareModal.classList.remove('hidden');shareModal.classList.add('flex');updateFormatUI();
+});
+btnCloseShare.addEventListener('click',()=>{shareModal.classList.remove('flex');shareModal.classList.add('hidden');});
+btnCopyLink.addEventListener('click',()=>navigator.clipboard.writeText(getShareUrl()).then(()=>showToast('Link copied!',true)));
+btnSystemShare.addEventListener('click',async()=>{
+    if(navigator.share)try{await navigator.share({title:'Pattern',text:'Unlock pattern',url:getShareUrl()});}catch{}
+    else showToast('Not supported on this device',true);
+});
+inputExportTransparent.addEventListener('change',()=>{exportBgDesc.innerText=inputExportTransparent.checked?'Transparent background':'Solid background';});
+
+// auto playback
+function triggerPlayback(path){
+    currentPath=path;isPlaying=true;playbackIndex=0;playbackProgress=0;
+    if(path.length>0){const fd=dots.find(d=>d.id===path[0]);if(fd)triggerRipple(fd);}
+}
+btnReplay.addEventListener('click',()=>{if(isPlaying)return;const p=new URLSearchParams(location.search).get('p');if(p)triggerPlayback(p.split(',').map(Number));});
+
+// format helper
+const FMT_HINTS={gif:'Animated · works everywhere',webm:'Animated · all modern browsers',mp4:'Animated · Chrome & Edge only',png:'Still frame · start & end marked'};
+function updateFormatUI(){
+    const checked=document.querySelector('input[name="export-format"]:checked');
+    document.querySelectorAll('.fmt-opt').forEach(opt=>{
+        const r=opt.querySelector('input'),lbl=opt.querySelector('.fmt-label'),brd=opt.querySelector('.fmt-border');
+        const on=r.checked;
+        lbl.className='text-xs font-bold fmt-label '+(on?(isColorful?'text-violet-600 dark:text-violet-400':'text-zinc-900 dark:text-zinc-50'):'text-zinc-400 dark:text-zinc-500');
+        brd.className='absolute inset-0 rounded-xl border-2 pointer-events-none fmt-border '+(on?(isColorful?'border-violet-500 dark:border-violet-400':'border-zinc-900 dark:border-zinc-100'):'border-transparent');
+    });
+    exportBtnText.innerText=`Export as ${checked.value.toUpperCase()}`;
+    formatHint.innerText=FMT_HINTS[checked.value]||'';
+    const isPng=checked.value==='png';
+    transpRow.style.opacity=isPng?'0.4':'1';
+    inputExportTransparent.disabled=isPng;
+}
+document.querySelectorAll('input[name="export-format"]').forEach(r=>r.addEventListener('change',updateFormatUI));
+
+// offscreen render loop
+function renderFrames(path,fps,holdSecs,w,h,solidBg){
+    const ec=document.createElement('canvas');ec.width=w;ec.height=h;
+    const ectx=ec.getContext('2d',{willReadFrequently:true});
+    const speed=getSpeed();
+    const stepPerFrame=speed*(60/fps);
+    const segs=Math.max(0,path.length-1);
+    const totalAnim=segs>0?Math.ceil(segs/stepPerFrame):1;
+    const holdF=Math.round(holdSecs*fps);
+    const frames=[];
+    let pIdx=0,pProg=0;
+    for(let f=0;f<totalAnim+holdF;f++){
+        if(f<totalAnim&&segs>0){
+            pProg+=stepPerFrame;
+            while(pProg>=1&&pIdx<segs-1){pProg-=1;pIdx++;}
+            pProg=Math.min(pProg,1);
+        } else{pIdx=segs>0?segs-1:0;pProg=1;}
+        drawFrame(ectx,w,h,path,true,pIdx,pProg,false,null,false,true,false);
+        frames.push(ectx.getImageData(0,0,w,h));
+    }
+    return frames;
+}
+
+// gif quantization and lzw
+function exportGIF(path){
+    const W=300,H=300,FPS=24;
+    const frames=renderFrames(path,FPS,1.0,W,H,true);
+    const freq=new Map();
+    const SAMPLE=3;
+    frames.forEach(id=>{
+        const d=id.data;
+        for(let i=0;i<d.length;i+=4*SAMPLE){
+            const key=(d[i]<<16)|(d[i+1]<<8)|d[i+2];
+            freq.set(key,(freq.get(key)||0)+1);
+        }
+    });
+    const sorted=[...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,255);
+    const C=getColors();
+    const bgHex=C.bg.replace('#','');
+    const bgR=parseInt(bgHex.slice(0,2),16),bgG=parseInt(bgHex.slice(2,4),16),bgB=parseInt(bgHex.slice(4,6),16);
+    const palColors=[{r:bgR,g:bgG,b:bgB}];
+    sorted.forEach(([key])=>palColors.push({r:(key>>16)&0xFF,g:(key>>8)&0xFF,b:key&0xFF}));
+    const palSize=palColors.length;
+    const pal=new Uint8Array(256*3);
+    palColors.forEach((c,i)=>{pal[i*3]=c.r;pal[i*3+1]=c.g;pal[i*3+2]=c.b;});
+
+    const cache=new Map();
+    function nearest(r,g,b){
+        const key=(r<<16)|(g<<8)|b;
+        if(cache.has(key))return cache.get(key);
+        let best=0,bestD=Infinity;
+        for(let i=0;i<palSize;i++){
+            const dr=r-palColors[i].r,dg=g-palColors[i].g,db=b-palColors[i].b;
+            const d=dr*dr*0.299+dg*dg*0.587+db*db*0.114;
+            if(d<bestD){bestD=d;best=i;}
+        }
+        cache.set(key,best);return best;
+    }
+
+    const quantized=frames.map(id=>{
+        const d=id.data,pix=new Uint8Array(W*H);
+        for(let i=0;i<W*H;i++){
+            const p=i*4;
+            pix[i]=(d[p+3]<128)?0:nearest(d[p],d[p+1],d[p+2]);
+        }
+        return pix;
+    });
+
+    const out=[];
+    const le2=n=>[n&0xFF,(n>>8)&0xFF];
+    const pushStr=s=>{for(let i=0;i<s.length;i++)out.push(s.charCodeAt(i));};
+    pushStr('GIF89a');
+    out.push(...le2(W),...le2(H));
+    out.push(0xF7,0,0,0,0);
+    for(let i=0;i<256*3;i++)out.push(pal[i]);
+    pushStr('NETSCAPE2.0');out.push(3,1,0,0,0);
+    const delay=Math.round(100/FPS);
+    quantized.forEach(pix=>{
+        out.push(0x21,0xF9,4,0x00,...le2(delay),0,0);
+        out.push(0x2C,...le2(0),...le2(0),...le2(W),...le2(H),0);
+        out.push(8);
+        const comp=lzwEncode(pix,8);
+        for(let i=0;i<comp.length;i+=255){const c=comp.slice(i,i+255);out.push(c.length,...c);}
+        out.push(0);
+    });
+    out.push(0x3B);
+    return new Uint8Array(out);
+}
+
+function lzwEncode(pixels,minCode){
+    const clr=1<<minCode,eof=clr+1;
+    let codeSize=minCode+1,next=eof+1;
+    const tbl=new Map();
+    const reset=()=>{tbl.clear();for(let i=0;i<clr;i++)tbl.set(''+i,i);codeSize=minCode+1;next=eof+1;};
+    const out=[];let buf=0,blen=0;
+    const emit=code=>{buf|=code<<blen;blen+=codeSize;while(blen>=8){out.push(buf&0xFF);buf>>=8;blen-=8;}};
+    reset();emit(clr);
+    let str=''+pixels[0];
+    for(let i=1;i<pixels.length;i++){
+        const nxt=str+','+pixels[i];
+        if(tbl.has(nxt)){str=nxt;}
+        else{
+            emit(tbl.get(str));
+            if(next<4096){tbl.set(nxt,next++);if(next>(1<<codeSize)&&codeSize<12)codeSize++;}
+            else{emit(clr);reset();}
+            str=''+pixels[i];
+        }
+    }
+    emit(tbl.get(str));emit(eof);
+    if(blen>0)out.push(buf&0xFF);
+    return out;
+}
+
+// webm capture stream
+async function exportWebM(path,solidBg){
+    const W=480,H=480,FPS=30;
+    const ec=document.createElement('canvas');ec.width=W;ec.height=H;
+    const ectx=ec.getContext('2d');
+    const stream=ec.captureStream(FPS);
+    const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+    const rec=new MediaRecorder(stream,{mimeType:mime});
+    const chunks=[];
+    rec.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
+    const done=new Promise(res=>{rec.onstop=res;});
+    rec.start();
+    const frames=renderFrames(path,FPS,1.5,W,H,solidBg);
+    for(const frame of frames){
+        ectx.putImageData(frame,0,0);
+        await new Promise(r=>requestAnimationFrame(r));
+    }
+    await new Promise(r=>setTimeout(r,200));
+    rec.stop();await done;
+    return new Blob(chunks,{type:mime});
+}
+
+// mp4 webcodecs encoder
+async function exportMP4(path,solidBg){
+    if(!Mp4Muxer)throw new Error('mp4-muxer not loaded');
+    if(!window.VideoEncoder)throw new Error('WebCodecs not supported');
+    const W=480,H=480,FPS=30;
+    const frames=renderFrames(path,FPS,1.5,W,H,solidBg);
+    const{Muxer,ArrayBufferTarget}=Mp4Muxer;
+    const target=new ArrayBufferTarget();
+    const muxer=new Muxer({target,video:{codec:'avc',width:W,height:H},firstTimestampBehavior:'offset'});
+    let resolve,reject;
+    const done=new Promise((res,rej)=>{resolve=res;reject=rej;});
+    let encoded=0;
+    const encoder=new VideoEncoder({
+        output:(chunk,meta)=>{muxer.addVideoChunk(chunk,meta);encoded++;if(encoded===frames.length){muxer.finalize();resolve();}},
+        error:reject
+    });
+    encoder.configure({codec:'avc1.42001f',width:W,height:H,bitrate:2_000_000,framerate:FPS});
+    const tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;
+    const tctx=tmp.getContext('2d');
+    for(let i=0;i<frames.length;i++){
+        tctx.putImageData(frames[i],0,0);
+        const bmp=await createImageBitmap(tmp);
+        const vf=new VideoFrame(bmp,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
+        encoder.encode(vf,{keyFrame:i%30===0});
+        vf.close();bmp.close();
+    }
+    await encoder.flush();await done;
+    return new Blob([target.buffer],{type:'video/mp4'});
+}
+
+// dispatch download
+function setExporting(busy){
+    btnExportAction.disabled=busy;
+    exportSpinner.classList.toggle('hidden',!busy);
+    if(!busy)updateFormatUI();else exportBtnText.innerText='Processing…';
+}
+function dl(blob,name){
+    const u=URL.createObjectURL(blob),a=Object.assign(document.createElement('a'),{href:u,download:name});
+    a.click();setTimeout(()=>URL.revokeObjectURL(u),5000);
+    showToast('Export saved!',true);
+}
+
+btnExportAction.addEventListener('click',async()=>{
+    const fmt=document.querySelector('input[name="export-format"]:checked').value;
+    const solidBg=!inputExportTransparent.checked;
+    setExporting(true);
+    await new Promise(r=>setTimeout(r,60));
+    try{
+        if(fmt==='png'){
+            const W=560,H=560;
+            const ec=document.createElement('canvas');ec.width=W;ec.height=H;
+            const ectx=ec.getContext('2d');
+            drawFrame(ectx,W,H,currentPath,false,currentPath.length-1,1,false,null,false,solidBg,true);
+            ec.toBlob(b=>{dl(b,`pattern-${cols}x${rows}.png`);setExporting(false);},'image/png');
+        } else if(fmt==='gif'){
+            const gif=exportGIF(currentPath);
+            dl(new Blob([gif],{type:'image/gif'}),`pattern-${cols}x${rows}.gif`);
+            setExporting(false);
+        } else if(fmt==='webm'){
+            const blob=await exportWebM(currentPath,solidBg);
+            dl(blob,`pattern-${cols}x${rows}.webm`);
+            setExporting(false);
+        } else if(fmt==='mp4'){
+            try{
+                const blob=await exportMP4(currentPath,solidBg);
+                dl(blob,`pattern-${cols}x${rows}.mp4`);
+            } catch(err){
+                showToast('MP4 requires Chrome or Edge',true);
+                console.warn('MP4:',err);
+            }
+            setExporting(false);
+        }
+    } catch(err){
+        console.error(err);
+        showToast('Export failed',true);
+        setExporting(false);
+    }
+});
+
+// dom initialisation
+window.addEventListener('DOMContentLoaded',()=>{
+    initTheme();
+    const params=new URLSearchParams(location.search);
+    const pParam=params.get('p');
+    if(pParam){
+        document.body.classList.add('shared-view');
+        sharedControls.classList.remove('hidden');sharedControls.classList.add('flex');
+        cols=Math.min(6,Math.max(2,parseInt(params.get('w'))||3));
+        rows=Math.min(6,Math.max(2,parseInt(params.get('h'))||3));
+        allowSkipping=params.get('s')==='1';isColorful=params.get('c')==='1';
+        speedKey=params.get('sp')||'medium';
+        initGrid();applyVisualTheme();
+        setTimeout(()=>triggerPlayback(pParam.split(',').map(Number)),800);
+    } else initGrid();
+    runLoop();
+});
+</script>
+</body>
+</html>
